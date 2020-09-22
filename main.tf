@@ -1,35 +1,26 @@
-module "label" {
-  source      = "git::https://github.com/cloudposse/terraform-null-label.git?ref=tags/0.17.0"
-  enabled     = var.enabled
-  namespace   = var.namespace
-  name        = var.name
-  stage       = var.stage
-  environment = var.environment
-  delimiter   = var.delimiter
-  attributes  = var.attributes
-  tags        = var.tags
-}
-
-module "final_snapshot_label" {
-  source      = "git::https://github.com/cloudposse/terraform-null-label.git?ref=tags/0.17.0"
-  enabled     = var.enabled
-  namespace   = var.namespace
-  name        = var.name
-  stage       = var.stage
-  environment = var.environment
-  delimiter   = var.delimiter
-  attributes  = compact(concat(var.attributes, ["final", "snapshot"]))
-  tags        = var.tags
-}
-
 locals {
   computed_major_engine_version = var.engine == "postgres" ? join(".", slice(split(".", var.engine_version), 0, 1)) : join(".", slice(split(".", var.engine_version), 0, 2))
   major_engine_version          = var.major_engine_version == "" ? local.computed_major_engine_version : var.major_engine_version
 }
 
+data "aws_vpc" "default" {
+  filter {
+    name = "tag:Name"
+    values = ["VPC Default"]
+  }
+}
+
+data "aws_subnet_ids" "database" {
+  vpc_id = data.aws_vpc.default.id
+  filter {
+    name = "tag:Tier"
+    values = ["database"]
+  }
+}
+
 resource "aws_db_instance" "default" {
   count                 = var.enabled ? 1 : 0
-  identifier            = module.label.id
+  identifier            = module.this.id
   name                  = var.database_name
   username              = var.database_user
   password              = var.database_password
@@ -67,10 +58,9 @@ resource "aws_db_instance" "default" {
   copy_tags_to_snapshot       = var.copy_tags_to_snapshot
   backup_retention_period     = var.backup_retention_period
   backup_window               = var.backup_window
-  tags                        = module.label.tags
+  tags                        = module.this.tags
   deletion_protection         = var.deletion_protection
-  final_snapshot_identifier   = length(var.final_snapshot_identifier) > 0 ? var.final_snapshot_identifier : module.final_snapshot_label.id
-
+  final_snapshot_identifier   = module.this.id
   iam_database_authentication_enabled   = var.iam_database_authentication_enabled
   enabled_cloudwatch_logs_exports       = var.enabled_cloudwatch_logs_exports
   performance_insights_enabled          = var.performance_insights_enabled
@@ -82,9 +72,9 @@ resource "aws_db_instance" "default" {
 
 resource "aws_db_parameter_group" "default" {
   count  = length(var.parameter_group_name) == 0 && var.enabled ? 1 : 0
-  name   = module.label.id
+  name   = module.this.id
   family = var.db_parameter_group
-  tags   = module.label.tags
+  tags   = module.this.tags
 
   dynamic "parameter" {
     for_each = var.db_parameter
@@ -98,10 +88,10 @@ resource "aws_db_parameter_group" "default" {
 
 resource "aws_db_option_group" "default" {
   count                = length(var.option_group_name) == 0 && var.enabled ? 1 : 0
-  name                 = module.label.id
+  name                 = module.this.id
   engine_name          = var.engine
   major_engine_version = local.major_engine_version
-  tags                 = module.label.tags
+  tags                 = module.this.tags
 
   dynamic "option" {
     for_each = var.db_options
@@ -129,17 +119,17 @@ resource "aws_db_option_group" "default" {
 
 resource "aws_db_subnet_group" "default" {
   count      = var.enabled ? 1 : 0
-  name       = module.label.id
-  subnet_ids = var.subnet_ids
-  tags       = module.label.tags
+  name       = module.this.id
+  subnet_ids = data.aws_subnet_ids.database.ids
+  tags       = module.this.tags
 }
 
 resource "aws_security_group" "default" {
   count       = var.enabled ? 1 : 0
-  name        = module.label.id
+  name        = module.this.id
   description = "Allow inbound traffic from the security groups"
-  vpc_id      = var.vpc_id
-  tags        = module.label.tags
+  vpc_id      = data.aws_vpc.default.id
+  tags        = module.this.tags
 }
 
 resource "aws_security_group_rule" "ingress_security_groups" {
@@ -160,7 +150,7 @@ resource "aws_security_group_rule" "ingress_cidr_blocks" {
   from_port         = var.database_port
   to_port           = var.database_port
   protocol          = "tcp"
-  cidr_blocks       = var.allowed_cidr_blocks
+  cidr_blocks       = ["10.0.0.0/8"]
   security_group_id = join("", aws_security_group.default.*.id)
 }
 
