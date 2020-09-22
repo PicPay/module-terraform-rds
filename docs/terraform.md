@@ -72,6 +72,11 @@
 | subnet\_ids | List of subnets for the DB | `list(string)` | n/a | yes |
 | tags | Additional tags (e.g. `map('BusinessUnit','XYZ')` | `map(string)` | `{}` | no |
 | vpc\_id | VPC ID the DB instance will be created in | `string` | n/a | yes |
+| squad | Squad, e.g. 'infracore', 'p2p', 'card', for more [check squad list](https://picpay.atlassian.net/wiki/spaces/U/pages/681738929/Estrutura+de+tribos+-+PicPay) | `string` | `null` | yes |
+| bu | bu, e.g. The default value is 'picpay' | `string` | `picpay` | no |
+| costcenter | costcenter, A number for the cost center, [check cost center list](https://picpay.atlassian.net/wiki/spaces/IC/pages/958530159/PicPay+-+Centro+de+Custos) | `string` | `null` | yes |
+| tribe | tribe, A tribe name, [check tribe name list list](https://picpay.atlassian.net/wiki/spaces/U/pages/681738929/Estrutura+de+tribos+-+PicPay) | `string` | `null` | yes |
+| terraform | to know if the resource was created with terraform | `string` | `true` | no |
 
 ## Outputs
 
